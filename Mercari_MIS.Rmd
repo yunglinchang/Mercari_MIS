@@ -1,0 +1,609 @@
+---
+title: "Mercari"
+author: "第二組"
+date: "6/15/2019"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(echo = TRUE,error=TRUE)
+```
+
+1.團隊介紹：
+
+專案名稱：Mercari
+
+組員：
+
+    03152138 會計系 張永霖
+    04121256 英文系 賴宇安
+    04131045 數學系 陳冠霖
+    04131021 數學系 莊家懿
+    04121155 英文系 林玠豪
+    05121127 英文系 李庭瑩
+    06123901 德文系 鄭亞南
+    07133035 化學系 李柏勳
+
+
+2.專案介紹
+
+2.1 Kaggle資料科學競賽平台介紹
+
+    ∙數據建模和數據分析競賽平台。
+    ∙企業和研究者可在其上發布數據，統計學者和數據挖掘專家可在其上進行競賽以產生最好的模型。
+    
+2.2本專案使用之Kaggle資料科學比賽介紹
+
+   Mercari Price Suggestion Challenge
+   
+     ∙日本著名C2C(私對私)二手交易平台。
+     ∙商品的介紹及價格均由賣家自行輸入。
+     ∙比賽要求：參賽者需為Mecari構建一種自動建議正確的產品價格的算法，自動向在線賣家推薦產品價格。
+     
+2.3本專案之資訊管理應用系統動機與內容介紹
+
+   動機：
+   
+       在現實生活中，資料會持續的增加，如果沒有良好且井然有序的資料倉儲，在資料處理上勢必會是一個大麻煩。
+       
+   內容：
+   
+       我們希望以專案小組的身分，為Mecari這個公司建立一個符合他們需求的資料庫系統跟模型，提供未來更進一步分析與應用。
+       
+
+3.研究方法
+
+3.1 關聯式資料庫介紹
+
+    由兩個或兩個以上的資料表組成
+    資料表之間通過相同欄位值連接
+    組成元素：資料庫、資料表、欄位、欄位值、關聯
+    作法：將各種資料依照性質的不同，分別存放在幾個不同的表格中，表格與表格之間的關係則以共同的欄位值相互連結
+    
+
+3.2 R Markdown文件介紹
+    
+    An R Markdown(.Rmd) file is a record of your research
+    It contains the code that a scientist needs to reproduce your work along with the narration that a reader needs to understand your work
+
+4.研究資料
+
+4.1 Kaggle官網比賽資料集說明
+
+    1)train_id or test_id：ID
+    2)name:名稱。可能包括刪除的單詞，標記為[rm]
+    3)item_condition_id:商品狀況。賣方提供的物品的條件/狀況。
+    4)category_name:類別。由/分隔。
+    5)brand_name:品牌。
+    6)price:售價(美元)。預測的目標變量，test.tsv中不存在
+    7)shipping:運費。1:由賣方支付，0:由買方支付。
+    8)item_description：項目描述。可能包括刪除的單詞，標記為[rm].
+    
+4.2 本專案整理之資料表說明
+
+Member資料表
+
+    ID：會員ID
+    name：會員姓名
+    gender：會員性別
+    email：會員信箱
+    password：會員密碼
+    credit_cd：會員信用卡號
+    country：會員所在國家
+
+Transaction資料表
+
+    trans_id：訂單編號
+    trans_date:交易日期
+    train_id:商品ID
+    train_item:商品名稱
+    price:商品價格
+    payment_method:付款方式
+    shipping_method:運送方式
+
+4.3 本專案資料庫ERD實體關係圖
+
+
+5.資訊管理應用系統
+
+5.1 本專案之資訊管理應用系統架構說明
+
+
+匯入套件
+
+```{r package}
+install.packages(c("RODBC","RMySQL",'dbConnect','DBI','gWidgets','sqldf','data.table','devtools','curl','tictoc','data.table','devtools','tictoc'), force=FALSE)
+
+library(DBI)
+library(RMySQL)
+library(RODBC)
+library(dbConnect)
+library(DBI)
+library(gWidgets)
+library(RMySQL)
+library(sqldf)
+library(data.table)
+library(devtools)
+library(tictoc)
+```
+
+讀取資料
+
+```{r read data}
+product <- fread(file = "product.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+transaction <- fread(file = "transaction.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+review <- fread(file = "review.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+member <- fread(file = "member.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+seller <- fread(file = "seller.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+buyer <- fread(file = "buyer.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+notice <- fread(file = "notification.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+coupon <- fread(file = "coupon.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+ship <- fread(file = "shipping_method.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+pay <- fread(file = "payment_method.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+key <- fread(file = "searchkeyword.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+ppic <- fread(file = "productpicture.csv", header=TRUE, fill = TRUE, sep=",", encoding = "UTF-8")
+```
+
+連結MySQL資料庫伺服器
+
+dbConnect(),Create a connection to a DBMS
+
+```{r connect}
+connect <- DBI::dbConnect(drv = RMySQL::MySQL(),
+                          host = "127.0.0.1",
+                          port = 8889,
+                          user = "guest2",
+                          password = "zyn123",
+                          dbname = "final")
+#創建默認連接
+knitr::opts_chunk$set(connection = "connect")
+```
+
+```{r check version}
+dbGetQuery(connect,'select version()')
+dbListTables(connect)
+```
+
+##建立資料表
+
+```{r create table, eval=F, echo=T}
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE product(
+                    train_id VARCHAR(100),
+                    name VARCHAR(1000),
+                    item_condition_id VARCHAR(100),
+                    category_name VARCHAR(100),
+                    brand_name VARCHAR(100),
+                    price VARCHAR(100),
+                    shipping VARCHAR(100),
+                    item_description VARCHAR(10000),
+                    seller_id VARCHAR(100)
+                    );
+')
+
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE buyer(
+                    m_id VARCHAR(100),
+                    name VARCHAR(100),
+                    coup_id DOUBLE,
+                    trans_id VARCHAR(100),
+                    train_id VARCHAR(10000)
+                    );
+')
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE member(
+                    m_id VARCHAR(100),
+                    name VARCHAR(100),
+                    gender VARCHAR(100),
+                    email VARCHAR(100),
+                    password VARCHAR(100),
+                    credit_cd VARCHAR(100),
+                    country VARCHAR(100)
+                    );
+')
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE coupon(
+                    coup_id int(2) DEFAULT NULL,
+                    coup_name varchar(20) DEFAULT NULL,
+                    coup_date varchar(20)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+ ')
+dbGetQuery(connect, '                   
+                    /* CREATE TABLE */
+                    CREATE TABLE seller(
+                    m_id VARCHAR(100),
+                    name VARCHAR(100),
+                    train_id DOUBLE,
+                    item_name VARCHAR(100),
+                    item_price VARCHAR(10000)
+                    );
+')
+dbGetQuery(connect, '                      
+                    /* CREATE TABLE */
+                    CREATE TABLE review(
+                    review_id VARCHAR(10000),
+                    train_id DOUBLE,
+                    description VARCHAR(10000),
+                    rate VARCHAR(100)
+                    );
+')
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE shipping_method(
+                    ID DOUBLE,
+                    name VARCHAR(100),
+                    description VARCHAR(100)
+                    );
+')
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE transaction(
+                    trans_id VARCHAR(100),
+                    trans_date VARCHAR(100),
+                    train_id DOUBLE,
+                    trans_item VARCHAR(100),
+                    price DOUBLE,
+                    payment_method_id DOUBLE,
+                    shopping_method_id DOUBLE,
+                    s_id VARCHAR(100),
+                    b_id VARCHAR(100)
+                    );
+')
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE payment_method(
+                    ID DOUBLE,
+                    name VARCHAR(100),
+                    description VARCHAR(100)
+                    );
+')
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE notification(
+                    n_id VARCHAR(100),
+                    m_id VARCHAR(100),
+                    Date VARCHAR(100),
+                    description VARCHAR(100)
+                    );
+')
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE productpicture(
+                    ID VARCHAR(100),
+                    train_id DOUBLE,
+                    image_source VARCHAR(100)
+                    );
+')
+dbGetQuery(connect, '
+                    /* CREATE TABLE */
+                    CREATE TABLE searchkeyword(
+                    m_id VARCHAR(100),
+                    date VARCHAR(100),
+                    description VARCHAR(100)
+                    );
+'
+)
+```
+
+
+##上傳資料
+
+```{r upload data, eval=F, echo=T}
+toc_hour <- function() {
+  x <- toc()
+  (x$toc - x$tic) / 3600
+}
+
+###product
+data <- product #要匯入的資料表
+sqltable <- "product" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###transaction
+data <- transaction #要匯入的資料表
+sqltable <- "transaction" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable, "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###review
+data <- review #要匯入的資料表
+sqltable <- "review" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###member
+data <- member #要匯入的資料表
+sqltable <- "member" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###notification
+data <- notice #要匯入的資料表
+sqltable <- "notification" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###seller
+data <- seller #要匯入的資料表
+sqltable <- "seller" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###buyer
+data <- buyer #要匯入的資料表
+sqltable <- "buyer" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###coupon
+data <- coupon #要匯入的資料表
+sqltable <- "coupon" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###shipping_method
+data <- ship #要匯入的資料表
+sqltable <- "shipping_method" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###payment_method
+data <- pay #要匯入的資料表
+sqltable <- "payment_method" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###searchkeyword
+data <- key #要匯入的資料表
+sqltable <- "searchkeyword" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+###productpicture
+data <- ppic #要匯入的資料表
+sqltable <- "productpicture" #SQL上的資料表
+
+tic("loading data")
+for (i in 1:nrow(data)){
+  info <- gsub("\'", "", data[i,])
+  info <- gsub("\\\\", "", info)
+  query <- paste("INSERT INTO",sqltable , "(", paste(colnames(data), collapse = ","),") VALUES('", paste(info, collapse = "','"), "')")
+  print(i)
+  #print(query)
+  dbGetQuery(connect, query)
+}
+toc_hour()
+
+
+```
+
+
+
+5.2 資訊管理模組(一) 產品特定價格區間查詢模組
+
+    產品特定價格區間查詢模組是為了讓顧客可以自己選取商品，然後設定自己的理想預算
+```{r model 1} 
+#sql1 = 'select name,price,shipping,item_description from table'
+#item_name = readline(prompt = 'enter item:')
+#price_min = readline(prompt = 'your budget minimum:')
+#price_max = readline(prompt = 'your budget maximum:')
+item_name = 'XL'
+price_min = 1
+price_max = 25
+price_sql = paste0("SELECT train_id,name,item_condition_id,price,shipping,item_description from product where price >",price_min," and price <",price_max," and name like '%",item_name,"%'")
+price_data = dbGetQuery(connect ,price_sql)
+head(price_data)
+```
+
+5.3 資訊管理模組(二)免運費產品類別查詢模組
+
+    免運費產品類別查詢模組，這個是希望可以找出免運費商品然後看各類別的數量
+```{r model 2}
+#item_name = readline(prompt = 'enter item:')
+item_name = "shoe"
+#sql2 = 'SELECT category_name from product where shipping = 1'
+shipping_sql = paste0("SELECT train_id,category_name from product where shipping = 1 and name like '%",item_name,"%'")
+shipping_temp = dbGetQuery(connect ,shipping_sql)
+shipping_model = strsplit(as.character(shipping_temp$category_name),'/')
+shipping_list = list()
+
+for(all_data_list in 1:length(shipping_model)){
+  #print(all_data_list)
+  for (i in shipping_model[all_data_list]){
+    shipping_list = append(shipping_list,i)
+  }
+}
+shipping_vector = unlist(shipping_list, use.names=FALSE)
+shipping_data = summary(as.factor(shipping_vector))
+shipping_data = as.data.frame(shipping_data)
+head(shipping_data)
+```
+
+5.4 資訊管理模組(三)特定預算最新商品推薦模組
+
+    特定預算最新商品推薦模組，先讓顧客填入想要的預算價格，在這個價格下特地選出最新商品
+```{r model 3}
+#budget = readline(prompt = 'your budget:')
+budget = 50
+new_item_sql = paste0("SELECT train_id,name,price,shipping,item_description from product where price <",budget," and item_condition_id = 1")
+new_item_data = dbGetQuery(connect ,new_item_sql)
+head(new_item_data)
+```
+
+5.5 資訊管理模組(四)推薦買家關聯產品
+
+    推薦買家關聯商品根據買家填入的想要物品，去找出名稱中包含這些字的商品資訊，並傳回給顧客
+```{r model 4}
+sql4 = 'SELECT name,category_name,item_description from tableall'
+#item_name = readline(prompt="enter item: ")
+item_name = "shirt"
+name_sql = paste0("SELECT train_id,name,category_name,item_description from product where name like '%",item_name,"%'"," and item_description like '%",item_name,"%'")
+name_data = dbGetQuery(connect ,name_sql)
+head(name_data)
+```
+
+5.6 資訊管理模組(五)五大品牌查詢模組
+
+    像是鞋子或3C等，在還沒確定目標前，可能會想先知道有哪些比較大的品牌，此模組可以選擇想買的商品類別，然後列出五大品牌
+```{r model 5}
+#category = readline(prompt = 'you want category:')
+category = "Men"
+brand_sql = paste0("SELECT brand_name,count(brand_name) as cb from product where LENGTH(brand_name) > 0 and category_name like '%",category,"%' GROUP by brand_name ORDER BY cb  DESC;")
+brand_data = dbGetQuery(connect ,brand_sql)
+brand_data = brand_data[-1,]
+brand_data = brand_data[1:5,]
+rownames(brand_data) = 1:nrow(brand_data)
+head(brand_data)
+```
+
+
+5.7 資訊管理模組(六)評論特定星等篩選模型
+
+    此模型可以用特定星等去篩選出特定的評價描述，例如購買前會讓人在意的一星評價
+```{r model 6}
+rated <- paste("select DISTINCT(p.train_id),p.name,p.item_condition_id,r.rate,r.description,p.price from product as p left join(SELECT train_id,description,rate from review where rate = ","1",") as r on p.train_id = r.train_id where name like '%Air Jordan%'")
+ratedjordan = dbGetQuery(connect ,rated)
+head(ratedjordan)
+```
+
+5.8 資訊管理模組(七)特定賣家商品模組
+
+    因為優惠門檻通常只能同賣家的累計，所以可以選擇特定賣家，再搜尋此賣家的所有商品
+```{r model 7}
+selling <- "SELECT s.*,p.* FROM seller as s 
+left join (select * from product) as p
+on s.train_id = p.train_id
+where m_id like '%M0134%'"
+sold = dbGetQuery(connect ,selling)
+head(sold)
+```
+
+5.9 資訊管理模組(八)折價券即將到期提醒模型
+     
+    以防折價券在想使用時才發現過期，需要時間提醒的機制，如果這個折價卷快到期了就傳email提醒買家
+```{r model 8}
+mail <- "SELECT b.m_id,m.gender,m.email,b.name,b.coup_id,c.date_difference FROM buyer as b left join (SELECT *,TIMESTAMPDIFF(DAY,CONVERT(NOW(), DATE),`coup_date`) as date_difference FROM coupon WHERE TIMESTAMPDIFF(DAY,CONVERT(NOW(), DATE),`coup_date`)>=5) as c on b.coup_id = c.coup_id left join (select m_id,name,gender,email FROM `member`) as m on m.m_id = b.m_id"
+mailed = dbGetQuery(connect ,mail)
+head(mailed)
+```
+
+6.結論與未來建議
+
+    在這個資訊大爆炸的時代，資料管理儼然已成為一門不可或缺的課題，而資料庫正是資料分析及管理最根本的基礎。因此熟悉資料庫軟體程式的操作、了解資料庫建置背後的架構意義，對將來從事資料科學相關工作可說是至關重要，藉由這堂課對資料庫有粗淺的認識，期望在未來能更精進。

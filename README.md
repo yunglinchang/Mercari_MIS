@@ -1,5 +1,5 @@
 # Mercari Management Information System
-A database system with 8 application modules in R markdown for Mercari’s 1400K+ data.
+Mercari, Japan’s biggest community-powered shopping app, hosted a price suggestion challenge on Kaggle to build an algorithm that automatically suggests the right product prices. **The project uses the 1.4M+ data and builds a database system with 8 application modules in R markdown for Mercari.**
 
 ## Build status
 [![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/joemccann/dillinger) [![codecov](https://codecov.io/gh/yunglinchang/Mercari_MIS/branch/master/graph/badge.svg)](https://codecov.io/gh/yunglinchang/Mercari_MIS)
